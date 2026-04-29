@@ -12,6 +12,7 @@ import java.util.Objects;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
+import org.jspecify.annotations.Nullable;
 import run.halo.app.extension.AbstractExtension;
 import run.halo.app.extension.GVK;
 import run.halo.app.extension.GroupVersionKind;
@@ -64,9 +65,11 @@ public class Post extends AbstractExtension {
     public static final String ARCHIVE_DAY_LABEL = "content.halo.run/archive-day";
 
     @Schema(requiredMode = RequiredMode.REQUIRED)
+    @Nullable
     private PostSpec spec;
 
     @Schema
+    @Nullable
     private PostStatus status;
 
     @JsonIgnore
@@ -139,7 +142,7 @@ public class Post extends AbstractExtension {
         @Schema(requiredMode = RequiredMode.REQUIRED, defaultValue = "true")
         private Boolean allowComment;
 
-        @Schema(requiredMode = RequiredMode.REQUIRED, defaultValue = "PUBLIC")
+        @Schema(requiredMode = RequiredMode.REQUIRED)
         private VisibleEnum visible;
 
         @Schema(requiredMode = RequiredMode.REQUIRED, defaultValue = "0")

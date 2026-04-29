@@ -11,7 +11,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.server.reactive.observation.ServerRequestObservationContext;
-import org.springframework.lang.NonNull;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.reactive.handler.AbstractHandlerMapping;
@@ -19,7 +18,7 @@ import org.springframework.web.reactive.socket.WebSocketHandler;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.util.pattern.PathPattern;
 import reactor.core.publisher.Mono;
-import run.halo.app.infra.console.WebSocketUtils;
+import run.halo.app.infra.ui.WebSocketUtils;
 
 public class WebSocketHandlerMapping extends AbstractHandlerMapping
     implements WebSocketEndpointManager, InitializingBean {
@@ -34,7 +33,6 @@ public class WebSocketHandlerMapping extends AbstractHandlerMapping
     }
 
     @Override
-    @NonNull
     public Mono<WebSocketHandler> getHandlerInternal(ServerWebExchange exchange) {
         var request = exchange.getRequest();
         if (!HttpMethod.GET.equals(request.getMethod())

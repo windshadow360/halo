@@ -4,7 +4,6 @@ import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.jsoup.Jsoup;
 import org.jsoup.safety.Safelist;
-import org.springframework.lang.NonNull;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.util.Assert;
 import reactor.core.publisher.Mono;
@@ -30,7 +29,8 @@ public abstract class AbstractCommentService {
         // Allow <code> tag's class attribute, for syntax highlighting
         .addAttributes("code", "class")
         // Allow <a> tag's target attribute
-        .addAttributes("a", "target");
+        .addAttributes("a", "target")
+        .preserveRelativeLinks(true);
 
     protected Mono<User> fetchCurrentUser() {
         return ReactiveSecurityContextHolder.getContext()
@@ -91,7 +91,7 @@ public abstract class AbstractCommentService {
      * @param html html content
      * @return true if the html is safe, false otherwise
      */
-    protected boolean isSafeHtml(@NonNull String html) {
+    protected boolean isSafeHtml(String html) {
         return Jsoup.isValid(html, safelist);
     }
 }

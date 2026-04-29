@@ -14,7 +14,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Sort;
-import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
@@ -197,6 +196,11 @@ public class PostServiceImpl extends AbstractContentService implements PostServi
         return Mono.defer(
                 () -> {
                     var post = postRequest.post();
+
+                    if (post.getSpec().getOwner() != null) {
+                        return Mono.just(post);
+                    }
+
                     return getContextUsername()
                         .doOnNext(username -> post.getSpec().setOwner(username))
                         .thenReturn(post);
@@ -269,7 +273,7 @@ public class PostServiceImpl extends AbstractContentService implements PostServi
     }
 
     @Override
-    public Mono<Post> updateBy(@NonNull Post post) {
+    public Mono<Post> updateBy(Post post) {
         return client.update(post);
     }
 

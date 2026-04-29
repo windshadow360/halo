@@ -1,5 +1,4 @@
 <script lang="ts" setup>
-import StatusDotField from "@/components/entity-fields/StatusDotField.vue";
 import { ucApiClient } from "@halo-dev/api-client";
 import {
   VButton,
@@ -11,6 +10,7 @@ import {
 import { useQuery } from "@tanstack/vue-query";
 import { ref } from "vue";
 import RiShieldKeyholeLine from "~icons/ri/shield-keyhole-line";
+import StatusDotField from "@/components/entity-fields/StatusDotField.vue";
 import TotpConfigureModal from "./TotpConfigureModal.vue";
 import TotpDeletionModal from "./TotpDeletionModal.vue";
 import TwoFactorDisableModal from "./TwoFactorDisableModal.vue";
@@ -119,21 +119,25 @@ const totpDeletionModalVisible = ref(false);
   </Transition>
   <TotpConfigureModal
     v-if="totpConfigureModalVisible"
+    :totp-configured="settings?.totpConfigured"
     @close="totpConfigureModalVisible = false"
   />
 
   <TotpDeletionModal
     v-if="totpDeletionModalVisible"
+    :totp-configured="settings?.totpConfigured"
     @close="totpDeletionModalVisible = false"
   />
 
   <TwoFactorEnableModal
     v-if="twoFactorEnableModalVisible"
+    :totp-configured="settings?.totpConfigured"
     @close="twoFactorEnableModalVisible = false"
   />
 
   <TwoFactorDisableModal
     v-if="twoFactorDisableModalVisible"
+    :totp-configured="settings?.totpConfigured"
     @close="twoFactorDisableModalVisible = false"
   />
 </template>

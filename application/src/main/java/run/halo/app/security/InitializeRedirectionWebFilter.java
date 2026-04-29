@@ -3,11 +3,10 @@ package run.halo.app.security;
 import static org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers.pathMatchers;
 
 import java.net.URI;
+import java.util.Set;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.lang.NonNull;
 import org.springframework.security.web.server.DefaultServerRedirectStrategy;
 import org.springframework.security.web.server.ServerRedirectStrategy;
 import org.springframework.security.web.server.util.matcher.AndServerWebExchangeMatcher;
@@ -28,22 +27,28 @@ import run.halo.app.infra.InitializationStateGetter;
  * @since 2.5.2
  */
 @Component
-@RequiredArgsConstructor
-public class InitializeRedirectionWebFilter implements WebFilter {
+class InitializeRedirectionWebFilter implements WebFilter {
     private final URI location = URI.create("/system/setup");
-    private final ServerWebExchangeMatcher redirectMatcher = new AndServerWebExchangeMatcher(
-        pathMatchers(HttpMethod.GET, "/", "/console/**", "/uc/**", "/login", "/signup"),
-        new MediaTypeServerWebExchangeMatcher(MediaType.TEXT_HTML)
-    );
+    private final ServerWebExchangeMatcher redirectMatcher;
 
     private final InitializationStateGetter initializationStateGetter;
 
     @Getter
     private ServerRedirectStrategy redirectStrategy = new DefaultServerRedirectStrategy();
 
+    InitializeRedirectionWebFilter(InitializationStateGetter initializationStateGetter) {
+        this.initializationStateGetter = initializationStateGetter;
+
+        var html = new MediaTypeServerWebExchangeMatcher(MediaType.TEXT_HTML);
+        html.setIgnoredMediaTypes(Set.of(MediaType.ALL));
+        this.redirectMatcher = new AndServerWebExchangeMatcher(
+            pathMatchers(HttpMethod.GET, "/", "/console/**", "/uc/**", "/login", "/signup"),
+            html
+        );
+    }
+
     @Override
-    @NonNull
-    public Mono<Void> filter(@NonNull ServerWebExchange exchange, @NonNull WebFilterChain chain) {
+    public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         return redirectMatcher.matches(exchange)
             .flatMap(matched -> {
                 if (!matched.isMatch()) {

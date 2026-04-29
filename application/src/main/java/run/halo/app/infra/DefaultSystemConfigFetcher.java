@@ -13,15 +13,14 @@ import org.springframework.context.ApplicationListener;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.convert.ConversionService;
-import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 import run.halo.app.extension.ConfigMap;
 import run.halo.app.extension.ReactiveExtensionClient;
 import run.halo.app.infra.utils.JsonParseException;
-import run.halo.app.infra.utils.JsonUtils;
 import run.halo.app.infra.utils.ReactiveUtils;
 import run.halo.app.infra.utils.SystemConfigUtils;
+import tools.jackson.databind.json.JsonMapper;
 
 @Component
 @RequiredArgsConstructor
@@ -30,6 +29,8 @@ class DefaultSystemConfigFetcher
     implements SystemConfigFetcher, ApplicationListener<SystemConfigChangedEvent> {
 
     private static final Duration BLOCKING_TIMEOUT = ReactiveUtils.DEFAULT_TIMEOUT;
+
+    private final JsonMapper mapper;
 
     private final ReactiveExtensionClient extensionClient;
 
@@ -68,7 +69,7 @@ class DefaultSystemConfigFetcher
                 if (conversionService.canConvert(String.class, type)) {
                     return conversionService.convert(stringValue, type);
                 }
-                return JsonUtils.jsonToObject(stringValue, type);
+                return mapper.readValue(stringValue, type);
             });
     }
 
@@ -95,7 +96,6 @@ class DefaultSystemConfigFetcher
         return fetch(SystemSetting.ThemeRouteRules.GROUP, SystemSetting.ThemeRouteRules.class);
     }
 
-    @NonNull
     private Mono<Map<String, String>> getValuesInternal() {
         return configMapMono;
     }

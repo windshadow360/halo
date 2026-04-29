@@ -6,7 +6,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Objects;
 import lombok.Data;
 import org.jspecify.annotations.Nullable;
-import org.springframework.lang.NonNull;
 
 @Data
 @Schema(description = "Extension reference object. The name is mandatory")
@@ -70,10 +69,20 @@ public class Ref {
      * @param extension must not be null.
      * @return true if they are equal; false otherwise.
      */
-    public static boolean equals(@NonNull Ref ref, @NonNull ExtensionOperator extension) {
+    public static boolean equals(Ref ref, ExtensionOperator extension) {
         var gvk = extension.groupVersionKind();
         var name = extension.getMetadata().getName();
         return groupKindEquals(ref, gvk) && Objects.equals(ref.getName(), name);
+    }
+
+    /**
+     * Convert the ref to a string identifier with format "group/kind/name".
+     *
+     * @param ref the reference object
+     * @return the string identifier
+     */
+    public static String toIdentifier(Ref ref) {
+        return ref.getGroup() + "/" + ref.getKind() + "/" + ref.getName();
     }
 
 }

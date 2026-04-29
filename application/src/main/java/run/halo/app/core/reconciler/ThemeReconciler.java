@@ -7,20 +7,33 @@ import static run.halo.app.extension.ExtensionUtil.removeFinalizers;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.retry.support.RetryTemplate;
+import org.springframework.core.retry.RetryException;
+import org.springframework.core.retry.RetryPolicy;
+import org.springframework.core.retry.RetryTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.util.Assert;
 import org.springframework.util.FileSystemUtils;
+import org.springframework.util.backoff.FixedBackOff;
+import reactor.core.Exceptions;
 import run.halo.app.core.extension.AnnotationSetting;
 import run.halo.app.core.extension.Setting;
 import run.halo.app.core.extension.Theme;
+import run.halo.app.core.extension.notification.NotificationTemplate;
+import run.halo.app.extension.ConfigMap;
+import run.halo.app.extension.Extension;
 import run.halo.app.extension.ExtensionClient;
+import run.halo.app.extension.GroupVersionKind;
 import run.halo.app.extension.MetadataUtil;
+import run.halo.app.extension.Unstructured;
 import run.halo.app.extension.controller.Controller;
 import run.halo.app.extension.controller.ControllerBuilder;
 import run.halo.app.extension.controller.Reconciler;
@@ -34,6 +47,7 @@ import run.halo.app.infra.utils.ReactiveUtils;
 import run.halo.app.infra.utils.SettingUtils;
 import run.halo.app.infra.utils.VersionUtils;
 import run.halo.app.theme.TemplateEngineManager;
+import run.halo.app.theme.service.ThemeUtils;
 
 /**
  * Reconciler for theme.
@@ -41,9 +55,10 @@ import run.halo.app.theme.TemplateEngineManager;
  * @author guqing
  * @since 2.0.0
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
-public class ThemeReconciler implements Reconciler<Request> {
+class ThemeReconciler implements Reconciler<Request> {
     private static final Duration BLOCKING_TIMEOUT = ReactiveUtils.DEFAULT_TIMEOUT;
     private static final String FINALIZER_NAME = "theme-protection";
 
@@ -53,11 +68,19 @@ public class ThemeReconciler implements Reconciler<Request> {
     private final SystemVersionSupplier systemVersionSupplier;
     private final TemplateEngineManager templateEngineManager;
 
-    private final RetryTemplate retryTemplate = RetryTemplate.builder()
-        .maxAttempts(20)
-        .fixedBackoff(300)
-        .retryOn(IllegalStateException.class)
-        .build();
+    private RetryTemplate retryTemplate = new RetryTemplate(RetryPolicy.builder()
+        .backOff(new FixedBackOff(300, 20))
+        .predicate(IllegalStateException.class::isInstance)
+        .build());
+
+    /**
+     * Set retry template. Only for testing purpose.
+     *
+     * @param retryTemplate the retry template
+     */
+    void setRetryTemplate(RetryTemplate retryTemplate) {
+        this.retryTemplate = retryTemplate;
+    }
 
     @Override
     public Result reconcile(Request request) {
@@ -72,6 +95,7 @@ public class ThemeReconciler implements Reconciler<Request> {
                 }
                 addFinalizers(theme.getMetadata(), Set.of(FINALIZER_NAME));
 
+                reloadThemeExtensions(theme);
                 themeSettingDefaultConfig(theme);
                 reconcileStatus(theme);
                 client.update(theme);
@@ -84,6 +108,40 @@ public class ThemeReconciler implements Reconciler<Request> {
         return builder
             .extension(new Theme())
             .build();
+    }
+
+    private void reloadThemeExtensions(Theme theme) {
+        var themeName = theme.getMetadata().getName();
+        var currentThemeRoot = this.themeRoot.get().resolve(themeName);
+        var extensions = ThemeUtils.loadThemeResources(currentThemeRoot);
+        extensions.stream()
+            .filter(e -> ExtensionWhitelist.of(theme).isAllowed(e))
+            .forEach(e -> {
+                populateThemeNameLabel(e, themeName);
+                client.fetch(e.groupVersionKind(), e.getMetadata().getName())
+                    .ifPresentOrElse(
+                        existing -> {
+                            e.getMetadata().setVersion(existing.getMetadata().getVersion());
+                            log.debug("Updating extension [{}] for theme [{}]",
+                                e.getMetadata().getName(), themeName);
+                            client.update(e);
+                        },
+                        () -> {
+                            log.debug("Creating extension [{}] for theme [{}]",
+                                e.getMetadata().getName(), themeName);
+                            client.create(e);
+                        }
+                    );
+            });
+    }
+
+    private static void populateThemeNameLabel(Unstructured unstructured, String themeName) {
+        Map<String, String> labels = unstructured.getMetadata().getLabels();
+        if (labels == null) {
+            labels = new HashMap<>();
+            unstructured.getMetadata().setLabels(labels);
+        }
+        labels.put(Theme.THEME_NAME_LABEL, themeName);
     }
 
     void reconcileStatus(Theme theme) {
@@ -144,12 +202,16 @@ public class ThemeReconciler implements Reconciler<Request> {
         var settingName = theme.getSpec().getSettingName();
         if (StringUtils.isNotBlank(settingName)) {
             client.fetch(Setting.class, settingName).ifPresent(client::delete);
-            retryTemplate.execute(callback -> {
-                client.fetch(Setting.class, settingName).ifPresent(setting -> {
-                    throw new IllegalStateException("Waiting for setting to be deleted.");
+            try {
+                retryTemplate.execute(() -> {
+                    client.fetch(Setting.class, settingName).ifPresent(setting -> {
+                        throw new IllegalStateException("Waiting for setting to be deleted.");
+                    });
+                    return null;
                 });
-                return null;
-            });
+            } catch (RetryException e) {
+                throw Exceptions.propagate(e);
+            }
         }
         // delete annotation setting
         deleteAnnotationSettings(theme.getMetadata().getName());
@@ -163,13 +225,17 @@ public class ThemeReconciler implements Reconciler<Request> {
             client.delete(annotationSetting);
         }
 
-        retryTemplate.execute(callback -> {
-            var annotationSettings = listAnnotationSettingsByThemeName(themeName);
-            if (annotationSettings.isEmpty()) {
-                return null;
-            }
-            throw new IllegalStateException("Waiting for annotation settings to be deleted.");
-        });
+        try {
+            retryTemplate.execute(() -> {
+                var annotationSettings = listAnnotationSettingsByThemeName(themeName);
+                if (annotationSettings.isEmpty()) {
+                    return null;
+                }
+                throw new IllegalStateException("Waiting for annotation settings to be deleted.");
+            });
+        } catch (RetryException e) {
+            throw Exceptions.propagate(e);
+        }
     }
 
     private List<AnnotationSetting> listAnnotationSettingsByThemeName(String themeName) {
@@ -188,4 +254,61 @@ public class ThemeReconciler implements Reconciler<Request> {
         }
     }
 
+    static class ExtensionWhitelist {
+
+        private final Set<AllowedExtension> rules;
+
+        private ExtensionWhitelist(Theme theme) {
+            this.rules = getRules(theme);
+        }
+
+        public static ExtensionWhitelist of(Theme theme) {
+            return new ExtensionWhitelist(theme);
+        }
+
+        public boolean isAllowed(Unstructured unstructured) {
+            return this.rules.stream()
+                .anyMatch(rule -> rule.matches(unstructured));
+        }
+
+        private Set<AllowedExtension> getRules(Theme theme) {
+            var rules = new HashSet<AllowedExtension>();
+            rules.add(AllowedExtension.of(AnnotationSetting.class));
+            rules.add(AllowedExtension.of(NotificationTemplate.class));
+
+            var configMapName = theme.getSpec().getConfigMapName();
+            if (StringUtils.isNotBlank(configMapName)) {
+                rules.add(AllowedExtension.of(ConfigMap.class, configMapName));
+            }
+
+            var settingName = theme.getSpec().getSettingName();
+            if (StringUtils.isNotBlank(settingName)) {
+                rules.add(AllowedExtension.of(Setting.class, settingName));
+            }
+            return rules;
+        }
+    }
+
+    record AllowedExtension(String apiGroup, String kind, String name) {
+        AllowedExtension {
+            Assert.notNull(apiGroup, "The apiGroup must not be null");
+            Assert.notNull(kind, "Kind must not be null");
+        }
+
+        public static <E extends Extension> AllowedExtension of(Class<E> clazz) {
+            return of(clazz, null);
+        }
+
+        public static <E extends Extension> AllowedExtension of(Class<E> clazz, String name) {
+            var gvk = GroupVersionKind.fromExtension(clazz);
+            return new AllowedExtension(gvk.group(), gvk.kind(), name);
+        }
+
+        public boolean matches(Unstructured unstructured) {
+            var groupVersionKind = unstructured.groupVersionKind();
+            return this.apiGroup.equals(groupVersionKind.group())
+                && this.kind.equals(groupVersionKind.kind())
+                && (this.name == null || this.name.equals(unstructured.getMetadata().getName()));
+        }
+    }
 }

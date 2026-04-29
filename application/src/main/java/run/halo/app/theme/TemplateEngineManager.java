@@ -1,9 +1,8 @@
 package run.halo.app.theme;
 
-import lombok.NonNull;
 import org.pf4j.PluginManager;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.thymeleaf.ThymeleafProperties;
+import org.springframework.boot.thymeleaf.autoconfigure.ThymeleafProperties;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ConcurrentLruCache;
 import org.thymeleaf.dialect.IDialect;
@@ -124,7 +123,6 @@ public class TemplateEngineManager {
         return engine;
     }
 
-    @NonNull
     private PluginClassloaderTemplateResolver createPluginClassloaderTemplateResolver() {
         var pluginTemplateResolver = new PluginClassloaderTemplateResolver(pluginManager);
         pluginTemplateResolver.setPrefix(thymeleafProperties.getPrefix());

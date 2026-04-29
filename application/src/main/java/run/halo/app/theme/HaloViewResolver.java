@@ -8,12 +8,11 @@ import java.util.Optional;
 import org.attoparser.ParseException;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.thymeleaf.ThymeleafProperties;
 import org.springframework.boot.context.properties.PropertyMapper;
+import org.springframework.boot.thymeleaf.autoconfigure.ThymeleafProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.Ordered;
 import org.springframework.http.MediaType;
-import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.util.unit.DataSize;
 import org.springframework.web.ErrorResponse;
@@ -57,24 +56,18 @@ public class HaloViewResolver extends ThymeleafReactiveViewResolver implements I
         setViewClass(HaloView.class);
         var map = PropertyMapper.get();
         map.from(thymeleafProperties::getEncoding)
-            .whenNonNull()
             .to(this::setDefaultCharset);
         map.from(thymeleafProperties::getExcludedViewNames)
-            .whenNonNull()
             .to(this::setExcludedViewNames);
         map.from(thymeleafProperties::getViewNames)
-            .whenNonNull()
             .to(this::setViewNames);
 
         var reactive = thymeleafProperties.getReactive();
         map.from(reactive::getMediaTypes)
-            .whenNonNull()
             .to(this::setSupportedMediaTypes);
         map.from(reactive::getFullModeViewNames)
-            .whenNonNull()
             .to(this::setFullModeViewNames);
         map.from(reactive::getChunkedModeViewNames)
-            .whenNonNull()
             .to(this::setChunkedModeViewNames);
         map.from(reactive::getMaxChunkSize)
             .asInt(DataSize::toBytes)
@@ -127,9 +120,8 @@ public class HaloViewResolver extends ThymeleafReactiveViewResolver implements I
         }
 
         @Override
-        @NonNull
         protected Mono<Map<String, Object>> getModelAttributes(Map<String, ?> model,
-            @NonNull ServerWebExchange exchange) {
+            ServerWebExchange exchange) {
             Mono<Map<String, Object>> contextBasedStaticVariables =
                 getContextBasedStaticVariables(exchange);
             Mono<Map<String, Object>> modelAttributes = super.getModelAttributes(model, exchange);
@@ -145,7 +137,6 @@ public class HaloViewResolver extends ThymeleafReactiveViewResolver implements I
             );
         }
 
-        @NonNull
         private Mono<Map<String, Object>> getContextBasedStaticVariables(
             ServerWebExchange exchange) {
             ApplicationContext applicationContext = obtainApplicationContext();

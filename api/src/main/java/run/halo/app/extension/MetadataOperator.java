@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 
 /**
  * MetadataOperator contains some getters and setters for required fields of metadata.
@@ -16,6 +17,7 @@ import java.util.Set;
  * @author johnniang
  */
 @JsonDeserialize(as = Metadata.class)
+@tools.jackson.databind.annotation.JsonDeserialize(as = Metadata.class)
 @Schema(implementation = Metadata.class)
 public interface MetadataOperator {
 
@@ -25,19 +27,19 @@ public interface MetadataOperator {
 
     @Schema(name = "generateName", description = "The name field will be generated automatically "
         + "according to the given generateName field")
-    String getGenerateName();
+    @Nullable String getGenerateName();
 
     @Schema(name = "labels")
     @JsonProperty("labels")
-    Map<String, String> getLabels();
+    @Nullable Map<String, String> getLabels();
 
     @Schema(name = "annotations")
     @JsonProperty("annotations")
-    Map<String, String> getAnnotations();
+    @Nullable Map<String, String> getAnnotations();
 
     @Schema(name = "version", nullable = true)
     @JsonProperty("version")
-    Long getVersion();
+    @Nullable Long getVersion();
 
     @Schema(name = "creationTimestamp", nullable = true)
     @JsonProperty("creationTimestamp")
@@ -45,10 +47,10 @@ public interface MetadataOperator {
 
     @Schema(name = "deletionTimestamp", nullable = true)
     @JsonProperty("deletionTimestamp")
-    Instant getDeletionTimestamp();
+    @Nullable Instant getDeletionTimestamp();
 
     @Schema(name = "finalizers", nullable = true)
-    Set<String> getFinalizers();
+    @Nullable Set<String> getFinalizers();
 
     void setName(String name);
 

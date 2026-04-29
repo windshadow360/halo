@@ -9,7 +9,6 @@ import static org.springdoc.core.fn.builders.schema.Builder.schemaBuilder;
 import static org.springframework.http.HttpStatus.NO_CONTENT;
 import static org.springframework.web.reactive.function.server.RequestPredicates.contentType;
 
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.net.URI;
@@ -26,7 +25,6 @@ import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.http.codec.multipart.Part;
-import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
 import org.springframework.util.MultiValueMap;
@@ -53,6 +51,7 @@ import run.halo.app.infra.utils.JsonUtils;
 import run.halo.app.theme.TemplateEngineManager;
 import run.halo.app.theme.service.ThemeService;
 import run.halo.app.theme.service.ThemeUtils;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Endpoint for managing themes.
@@ -178,7 +177,7 @@ public class ThemeEndpoint implements CustomEndpoint {
                     .requestBody(requestBodyBuilder()
                         .required(true)
                         .content(contentBuilder().mediaType(MediaType.APPLICATION_JSON_VALUE)
-                            .schema(schemaBuilder().implementation(ObjectNode.class))))
+                            .schema(schemaBuilder().implementation(Object.class))))
                     .response(responseBuilder()
                         .responseCode(String.valueOf(NO_CONTENT.value()))
                         .implementation(Void.class))
@@ -251,8 +250,7 @@ public class ThemeEndpoint implements CustomEndpoint {
                         .required(true)
                         .implementation(String.class)
                     )
-                    .response(responseBuilder()
-                        .implementation(ObjectNode.class))
+                    .response(responseBuilder().implementation(Object.class))
             )
             .build();
     }
@@ -376,7 +374,6 @@ public class ThemeEndpoint implements CustomEndpoint {
             super(queryParams);
         }
 
-        @NonNull
         public Boolean getUninstalled() {
             return Boolean.parseBoolean(queryParams.getFirst("uninstalled"));
         }
@@ -462,7 +459,7 @@ public class ThemeEndpoint implements CustomEndpoint {
             });
     }
 
-    private Mono<List<Theme>> filterUnInstalledThemes(@NonNull List<Theme> allThemes) {
+    private Mono<List<Theme>> filterUnInstalledThemes(List<Theme> allThemes) {
         return client.list(Theme.class, null, null)
             .map(theme -> theme.getMetadata().getName())
             .collectList()

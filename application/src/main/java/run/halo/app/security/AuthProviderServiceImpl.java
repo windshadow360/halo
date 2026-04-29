@@ -15,12 +15,10 @@ import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.OptimisticLockingFailureException;
-import org.springframework.lang.NonNull;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 import reactor.util.retry.Retry;
 import run.halo.app.core.extension.AuthProvider;
 import run.halo.app.core.extension.UserConnection;
@@ -72,13 +70,11 @@ public class AuthProviderServiceImpl implements AuthProviderService {
         var allProvidersMono =
             client.listAll(AuthProvider.class, listOptions, ExtensionUtil.defaultSort())
                 .map(this::convertTo)
-                .collectList()
-                .subscribeOn(Schedulers.boundedElastic());
+                .collectList();
 
         var boundProvidersMono = listMyConnections()
             .map(connection -> connection.getSpec().getRegistrationId())
-            .collect(Collectors.toSet())
-            .subscribeOn(Schedulers.boundedElastic());
+            .collect(Collectors.toSet());
 
         return Mono.zip(allProvidersMono, boundProvidersMono, fetchProviderStates())
             .map(tuple3 -> {
@@ -141,7 +137,7 @@ public class AuthProviderServiceImpl implements AuthProviderService {
         }
 
         @Override
-        public int compareTo(@NonNull AuthProviderWithPriority o) {
+        public int compareTo(AuthProviderWithPriority o) {
             return Comparator.comparingInt(AuthProviderWithPriority::getPriority)
                 .thenComparing(AuthProviderWithPriority::getName)
                 .compare(this, o);
@@ -152,8 +148,7 @@ public class AuthProviderServiceImpl implements AuthProviderService {
         return getSystemConfigMap()
             .map(AuthProviderServiceImpl::getAuthProviderConfig)
             .map(SystemSetting.AuthProvider::getStates)
-            .defaultIfEmpty(List.of())
-            .subscribeOn(Schedulers.boundedElastic());
+            .defaultIfEmpty(List.of());
     }
 
     Flux<UserConnection> listMyConnections() {
@@ -198,7 +193,6 @@ public class AuthProviderServiceImpl implements AuthProviderService {
             .get(AuthProvider.PRIVILEGED_LABEL));
     }
 
-    @NonNull
     private static SystemSetting.AuthProvider getAuthProviderConfig(ConfigMap configMap) {
         if (configMap.getData() == null) {
             configMap.setData(new HashMap<>());
